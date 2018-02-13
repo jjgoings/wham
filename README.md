@@ -32,7 +32,7 @@ from wham import WHAM
 
 wham = WHAM(T=300.0,metadata='metadata')
 wham.compute_free()
-wham.compute_pmf(hmin=-2.0,hmax=2.0,num_bins=40,pmf_coordinate=2)
+wham.compute_pmf(hmin=-2.0,hmax=2.0,num_bins=40,pmf_crd=2)
 ```
 
 which would compute the free energies from the umbrella sampling simulation defined along the reaction coordinate in your `metadata` file, then once those are computed it would build up the histogram from `-2.0` to `2.0` with 40 bins along the reaction coordinate in the second column of your trajectory data files. 
