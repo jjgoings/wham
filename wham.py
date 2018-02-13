@@ -3,7 +3,7 @@ import re
 import sys
 
 class WHAM(object):
-    def __init__(self,T,metadata):
+    def __init__(self,T,metadata,skip=1):
         self.metadata = metadata
         self.kbolt    = 0.001982923700 # Boltzmann's constant in kcal/mol K
         self.T        = T
@@ -13,6 +13,7 @@ class WHAM(object):
         self.forces = []
         self.restraint_coordinate = []
         self.computed_free = False  # flag for plotting PMF
+        self.skip = skip # skip every n-th instance of data
         # get windows and parameters
         with open(self.metadata) as fp:
             for line in fp:
@@ -37,14 +38,20 @@ class WHAM(object):
         for idx,window in enumerate(self.files):
             # restraint coordinate ensures trajectory data is consistent with
             # the applied restraint (e.g. restraint and traj data in same basis)
-            R     = np.loadtxt(window,usecols=[self.restraint_coordinate[idx]])
+            R     = np.loadtxt(window,usecols=range(1,max(self.restraint_coordinate)+1))
+            # shape of R can change if only on restraint_coordinate
+            R     = R.reshape(len(R),max(self.restraint_coordinate))
+            R = R[::self.skip] 
             if idx == 0:
                 self.R     = R
             else:
-                self.R     = np.vstack((self.R,R))
+                self.R     = np.dstack((self.R,R))
 
-        self.Nwind = self.R.shape[0]
-        self.nt    = self.R.shape[1]
+            #print(self.R.shape)
+
+
+        self.nt    = self.R.shape[0]
+        self.Nwind = self.R.shape[2]
 
     def compute_free(self,maxiter=10000,conver=1e-6):
         ebw = np.zeros((self.Nwind,self.nt,self.Nwind))
@@ -53,10 +60,12 @@ class WHAM(object):
         ebf2 = np.zeros_like(fact)
 
         # precompute exp(-BW_k(R_i,k))
+        # Only works when combining 2 disparate simulations, need to generalize
+        # and there has to be a better way to do this...
         for k in range(self.Nwind):
             for i in range(self.Nwind):
                 ebw[i,:,k] += np.exp(-self.B*0.5*self.forces[k]*
-                                      (self.R[i] - self.restraints[k])**2)
+                                      (self.R[:,self.restraint_coordinate[k]-1,i] - self.restraints[k])**2)
 
         oldebf = np.zeros_like(ebf)
         for n in range(maxiter):
@@ -95,18 +104,22 @@ class WHAM(object):
 
         # Load desired reaction coordinate for PMF
         for idx,window in enumerate(self.files):
+            R     = np.loadtxt(window,usecols=[self.restraint_coordinate[idx]])
             R_pmf = np.loadtxt(window,usecols=[self.pmf_coordinate])
+            R     = R[::self.skip]
+            R_pmf = R_pmf[::self.skip]
             if idx == 0:
+                self.R     = R
                 self.R_pmf = R_pmf 
             else:
+                self.R     = np.hstack((self.R,R))
                 self.R_pmf = np.hstack((self.R_pmf,R_pmf))
         
         # generate weights
-        R = self.R.reshape(self.nt*self.Nwind,)
         weights = 0.0
         for i in range(self.Nwind):
             weights += np.exp(-self.B*(0.5*self.forces[i]
-                       *(R - self.restraints[i])**2 - self.f[i]))
+                       *(self.R - self.restraints[i])**2 - self.f[i]))
 
         weights = 1.0/weights
         
@@ -131,5 +144,5 @@ class WHAM(object):
 if __name__ == "__main__":
     wham = WHAM(300.0,'metadata')
     wham.compute_free()
-    wham.compute_pmf(-2.0,2.0,40)
+    wham.compute_pmf(-2.0,-0.4,100,pmf_crd=2)
 
