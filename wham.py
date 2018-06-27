@@ -53,7 +53,7 @@ class WHAM(object):
         self.nt    = self.R.shape[0]
         self.Nwind = self.R.shape[2]
 
-    def compute_free(self,maxiter=10000,conver=1e-6):
+    def compute_free(self,maxiter=10000,conver=1e-6,save_free_energies='./free-energies.txt'):
         ebw = np.zeros((self.Nwind,self.nt,self.Nwind))
         ebf = np.ones((self.Nwind))
         fact = self.nt*ebf
@@ -83,7 +83,7 @@ class WHAM(object):
             self.f = np.log(ebf)/self.B
             if delta < conver:
                 print("Converged free-energies: \n",self.f)
-                np.savetxt('free-energies.txt',self.f,fmt='%.8f',delimiter=',')
+                np.savetxt(save_free_energies,self.f,fmt='%.8f',delimiter=',')
                 self.computed_free = True
                 break
             else:
@@ -91,7 +91,7 @@ class WHAM(object):
                     print("Free energies at iteration "+str(n)+": \n",self.f)
 
 
-    def compute_pmf(self,hmin,hmax,num_bins,pmf_crd=1,plot=True):
+    def compute_pmf(self,hmin,hmax,num_bins,pmf_crd=1,plot=True,load_free_energies='./free-energies.txt'):
 
         self.hmin = hmin
         self.hmax = hmax
@@ -100,7 +100,7 @@ class WHAM(object):
         self.do_plot = plot
 
         if not self.computed_free:
-            self.f = np.loadtxt('./free-energies.txt')
+            self.f = np.loadtxt(load_free_energies)
 
         # Load desired reaction coordinate for PMF
         for idx,window in enumerate(self.files):
